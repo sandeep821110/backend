@@ -15,6 +15,23 @@ const generateToken = (userId, email, isAdmin = false) => {
   );
 };
 
+// Cookie-based session: JWT lives in an httpOnly cookie the JS cannot read.
+// Cross-site (Vercel frontend -> Vercel backend) requires SameSite=None + Secure,
+// so that combination is only used when the app runs in production over HTTPS.
+const AUTH_COOKIE = 'access_token';
+
+const authCookieOptions = (isAdmin = false) => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  path: '/',
+  maxAge: (isAdmin ? 1 : 7) * 24 * 60 * 60 * 1000 // matches token: admin 1d, user 7d
+});
+
+const setAuthCookie = (res, token, isAdmin = false) => {
+  res.cookie(AUTH_COOKIE, token, authCookieOptions(isAdmin));
+};
+
 // Signup user
 const signUpUser = async (req, res) => {
     const { email } = req.body;
@@ -103,6 +120,7 @@ const verifyOTP = async (req, res) => {
 
         // Generate JWT token after successful verification
         const token = generateToken(user._id, user.email);
+        setAuthCookie(res, token);
 
         res.status(200).json({ 
             message: "Email verified successfully",
@@ -150,6 +168,7 @@ const loginUser = async (req, res) => {
 
             // Generate JWT token
             const token = generateToken(user._id, user.email);
+            setAuthCookie(res, token);
 
             return res.status(200).json({
                 message: "Login successful",
@@ -193,7 +212,8 @@ const loginUser = async (req, res) => {
 
 // Logout user
 const logoutUser = async (req, res) => {
-    // Since we're using JWT, actual logout happens client-side by removing the token
+    // Clear the httpOnly session cookie (client also drops its localStorage copy)
+    res.clearCookie(AUTH_COOKIE, { ...authCookieOptions(), maxAge: undefined, httpOnly: true });
     res.status(200).json({ message: "Logged out successfully" });
 };
 
@@ -254,6 +274,7 @@ const adminLogin = async (req, res) => {
         
         // Generate admin JWT token (valid for 1 day only)
         const token = generateToken('admin', email, true);
+        setAuthCookie(res, token, true);
         
         console.log('Admin login successful for:', email);
         

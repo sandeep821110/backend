@@ -3,52 +3,50 @@ import jwt from 'jsonwebtoken';
 import userModel from '../models/userModel.js';
 
 export const protect = async (req, res, next) => {
+  // Cookie-based session first (httpOnly), Bearer header as fallback
   let token;
 
-  if (
+  if (req.cookies?.access_token) {
+    token = req.cookies.access_token;
+  } else if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
-    try {
-      // Get token from header
-      token = req.headers.authorization.split(' ')[1];
+    token = req.headers.authorization.split(' ')[1];
+  }
 
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  if (!token) {
+    return res.status(401).json({ message: 'Not authorized, no token' });
+  }
 
-      // Check if token is expired
-      const currentTime = Math.floor(Date.now() / 1000);
-      if (decoded.exp < currentTime) {
-        return res.status(401).json({ message: 'Token expired' });
+  try {
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Get user from the token
+    if (decoded.isAdmin) {
+      req.user = {
+        id: 'admin',
+        email: decoded.email,
+        isAdmin: true,
+        tokenExpiry: new Date(decoded.exp * 1000)
+      };
+    } else {
+      req.user = await userModel.findById(decoded.id).select('-otp -otpValidity');
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not found' });
       }
-
-      // Get user from the token
-      if (decoded.isAdmin) {
-        req.user = { 
-          id: 'admin', 
-          email: decoded.email, 
-          isAdmin: true,
-          tokenExpiry: new Date(decoded.exp * 1000)
-        };
-      } else {
-        req.user = await userModel.findById(decoded.id).select('-otp -otpValidity');
-        if (!req.user) {
-          return res.status(401).json({ message: 'User not found' });
-        }
-      }
-
-      next();
-    } catch (error) {
-      if (error.name === 'TokenExpiredError') {
-        // Normal client state (idle session) - log concisely, no stack
-        console.warn(`[auth] expired token on ${req.method} ${req.originalUrl} (expiredAt: ${error.expiredAt?.toISOString()})`);
-        return res.status(401).json({ message: 'Token expired' });
-      }
-      console.error('Token verification error:', error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
     }
-  } else {
-    res.status(401).json({ message: 'Not authorized, no token' });
+
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      // Normal client state (idle session) - log concisely, no stack
+      console.warn(`[auth] expired token on ${req.method} ${req.originalUrl} (expiredAt: ${error.expiredAt?.toISOString()})`);
+      return res.status(401).json({ message: 'Token expired' });
+    }
+    console.error('Token verification error:', error);
+    res.status(401).json({ message: 'Not authorized, token failed' });
   }
 };
 

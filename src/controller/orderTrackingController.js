@@ -86,6 +86,53 @@ const normalizeTracking = (trackingDoc) => {
   }
 };
 
+// Map Order.orderStatus -> OrderTracking status enum
+const ORDER_STATUS_TO_TRACKING = {
+  PENDING: "order_placed",
+  CONFIRMED: "order_confirmed",
+  PROCESSING: "processing",
+  SHIPPED: "shipped",
+  OUT_FOR_DELIVERY: "out_for_delivery",
+  DELIVERED: "delivered",
+  CANCELLED: "cancelled",
+};
+
+// Fallback: build a tracking-shaped response straight from an Order document.
+// Admins often save a courier tracking number directly on the order
+// (PUT /api/orders/:id/status) without creating an OrderTracking record -
+// public/user lookups must still resolve those numbers.
+const buildTrackingFromOrder = (order) => {
+  const o = order && typeof order.toObject === "function" ? order.toObject() : order;
+  const status = ORDER_STATUS_TO_TRACKING[o.orderStatus] || "order_placed";
+
+  const trackingHistory = [];
+  if (o.createdAt) {
+    trackingHistory.push({ status: "order_placed", location: "Warehouse", description: "Order placed", timestamp: o.createdAt });
+  }
+  if (o.updatedAt && o.orderStatus !== "PENDING") {
+    trackingHistory.push({ status, location: "Fulfillment center", description: `Order ${String(o.orderStatus).toLowerCase().replace(/_/g, " ")}`, timestamp: o.outForDeliveryAt || o.updatedAt });
+  }
+  if (o.actualDelivery) {
+    trackingHistory.push({ status: "delivered", location: "Delivery address", description: "Order delivered", timestamp: o.actualDelivery });
+  }
+
+  return {
+    _id: o._id,
+    source: "order",
+    trackingNumber: o.trackingNumber,
+    status,
+    currentLocation: "",
+    carrier: {},
+    estimatedDeliveryDate: o.estimatedDelivery || null,
+    actualDeliveryDate: o.actualDelivery || null,
+    deliveryAttempts: [],
+    orderSnapshots: [],
+    trackingHistory,
+    orders: [{ _id: o._id, orderNumber: o.orderNumber, totalAmount: o.totalAmount, items: o.items, user: o.user }],
+    shippingAddressSnapshot: null
+  };
+};
+
 // CREATE OrderTracking (Admin)
 export const createOrderTracking = asyncHandler(async (req, res) => {
   if (!req.user?.isAdmin) return res.status(403).json({ success: false, message: "Admin only" });
@@ -188,9 +235,18 @@ export const getTrackingByNumber = asyncHandler(async (req, res) => {
     { path: "shippingAddress" }
   ]);
 
-  if (!tracking) return res.status(404).json({ success: false, message: "Tracking not found" });
+  if (tracking) {
+    return res.json({ success: true, data: normalizeTracking(tracking) });
+  }
 
-  res.json({ success: true, data: normalizeTracking(tracking) });
+  // Fallback: the number may be a courier number saved directly on the order
+  const order = await Order.findOne({ trackingNumber })
+    .populate([{ path: "user", select: "name email" }, { path: "shippingAddress" }]);
+  if (order) {
+    return res.json({ success: true, data: buildTrackingFromOrder(order) });
+  }
+
+  return res.status(404).json({ success: false, message: "Tracking not found" });
 });
 
 // UPDATE Tracking Status (Admin)
@@ -373,13 +429,24 @@ export const getTrackingByOrderNumber = asyncHandler(async (req, res) => {
   const { orderNumber } = req.params;
   if (!orderNumber) return res.status(400).json({ success: false, message: 'orderNumber required' });
 
-  const order = await Order.findOne({ orderNumber }).select('_id user');
+  const order = await Order.findOne({
+    $or: [{ orderNumber }, ...([orderNumber].filter(n => mongoose.Types.ObjectId.isValid(n)).map(n => ({ _id: n })))]
+  })
+    .populate([{ path: 'user', select: 'name email' }, { path: 'shippingAddress' }]);
+
   if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
   const tracking = await OrderTracking.findOne({ orders: order._id }).populate([{ path: 'orders', select: 'orderNumber totalAmount items user' }, { path: 'shippingAddress' }]);
-  if (!tracking) return res.status(404).json({ success: false, message: 'Tracking not found for this orderNumber' });
+  if (tracking) {
+    return res.json({ success: true, data: normalizeTracking(tracking) });
+  }
 
-  res.json({ success: true, data: normalizeTracking(tracking) });
+  // Fallback: no OrderTracking record - resolve from the order's own trackingNumber
+  if (order.trackingNumber) {
+    return res.json({ success: true, data: buildTrackingFromOrder(order) });
+  }
+
+  return res.status(404).json({ success: false, message: 'Tracking not found for this orderNumber' });
 });
 
 // internal notifyOrderStatusChange
