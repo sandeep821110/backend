@@ -1,0 +1,60 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch --runInBand",
+    "start": "node index.js",
+    "start:prod": "node -e \"process.env.NODE_ENV='production';require('child_process').spawn(process.execPath,['index.js'],{stdio:'inherit',env:{...process.env,NODE_ENV:'production'}})\"",
+    "dev": "nodemon index.js",
+    "start:pm2": "pm2 start ecosystem.config.cjs --env production",
+    "reload:pm2": "pm2 reload api --update-env",
+    "stop:pm2": "pm2 stop api"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@infobip-api/sdk": "^0.3.2",
+    "amqplib": "^2.0.1",
+    "async-handler-express": "^0.2.4",
+    "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
+    "cloudinary": "^1.41.3",
+    "color-name": "^2.0.0",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "debug": "^4.4.3",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "express-async-handler": "^1.2.0",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.18.0",
+    "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
+    "nodemailer": "^7.0.5",
+    "nodemon": "^3.1.10",
+    "otp-generator": "^4.0.1",
+    "pdfkit": "^0.17.2",
+    "rate-limit-redis": "^6.0.1",
+    "razorpay": "^2.9.6",
+    "streamifier": "^0.1.1",
+    "twilio": "^5.8.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.29.7",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
+  }
+}

@@ -1,0 +1,33 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+# ---------------------------------------------------------------
+# Load balancing on Railway:
+#   - Railway's edge load-balances across REPLICAS (set under
+#     Settings > Replicas). The app is fully stateless:
+#       * response cache  -> shared Redis
+#       * rate limiting   -> shared Redis store
+#       * queue consumers -> RabbitMQ competing consumers
+#   - Inside each replica, index.js cluster mode forks one worker
+#     per CPU core. Keep WEB_CONCURRENCY modest (e.g. 2) and scale
+#     replicas instead.
+#
+# Required environment variables (Railway Variables):
+#   MONGODB_URI          - MongoDB Atlas / Railway Mongo
+#   REDIS_URL            - from the Railway Redis plugin
+#                          (REDIS_PRIVATE_URL is used automatically)
+#   RABBITMQ_URL         - from the Railway RabbitMQ template
+#   JWT_SECRET           - auth secret
+#   CORS_ORIGINS         - e.g. https://your-frontend.up.railway.app,https://your-admin.up.railway.app
+#   NODE_ENV=production
+#   WEB_CONCURRENCY=2    - optional, workers per replica
+# Optional: CLOUDINARY_*, RAZORPAY_*, SMTP_*, etc.
+# ---------------------------------------------------------------
