@@ -64,8 +64,42 @@ const orderSchema = new mongoose.Schema({
     },
     orderStatus: {
         type: String,
-        enum: ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
+        enum: ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'],
         default: 'PENDING'
+    },
+    rider: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Rider',
+        default: null
+    },
+    riderAssignedAt: {
+        type: Date,
+        default: null
+    },
+    outForDeliveryAt: {
+        type: Date,
+        default: null
+    },
+    deliveryOtpHash: {
+        type: String,
+        default: ''
+    },
+    deliveryOtpExpiresAt: {
+        type: Date,
+        default: null
+    },
+    deliverySignature: {
+        type: String,
+        default: ''
+    },
+    deliveryProof: {
+        type: String,
+        enum: ['', 'OTP', 'SIGNATURE', 'OTP+SIGNATURE'],
+        default: ''
+    },
+    deliveryFailedReason: {
+        type: String,
+        default: ''
     },
     subtotal: {
         type: Number,
@@ -123,6 +157,7 @@ const orderSchema = new mongoose.Schema({
 orderSchema.index({ user: 1 });
 orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ orderStatus: 1 });
+orderSchema.index({ rider: 1 });
 orderSchema.index({ createdAt: -1 });
 
 // Virtual for calculating total items

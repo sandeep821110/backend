@@ -5,6 +5,14 @@ const carsolSliderImageSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    subtitle: {
+        type: String,
+        default: ''
+    },
+    description: {
+        type: String,
+        default: ''
+    },
     link: {
         type: String,
         default: ''

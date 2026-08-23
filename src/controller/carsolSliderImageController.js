@@ -73,6 +73,8 @@ export const createSlider = async (req, res) => {
 
         const newSlider = await CarsolSliderImage.create({
             name,
+            subtitle: req.body.subtitle || '',
+            description: req.body.description || '',
             link: link || '',
             images: images.slice(0, MAX_SLIDER_IMAGES)
         });
@@ -158,6 +160,8 @@ export const updateSlider = async (req, res) => {
         }
 
         if (req.body.name) slider.name = req.body.name;
+        if (req.body.subtitle !== undefined) slider.subtitle = req.body.subtitle;
+        if (req.body.description !== undefined) slider.description = req.body.description;
         if (req.body.link !== undefined) slider.link = req.body.link;
         if (newImages.length) slider.images = newImages.slice(0, MAX_SLIDER_IMAGES);
 

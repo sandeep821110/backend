@@ -23,6 +23,7 @@ import dashboardRouter from './src/routes/dashboardRoutes.js';
 import orderTrackingRoutes from './src/routes/orderTrackingRoutes.js';
 import carsolSliderRoutes from './src/routes/carsolSliderRoutes.js';
 import walletRouter from './src/routes/walletRoutes.js';
+import riderRouter from './src/routes/riderRoutes.js';
 
 const app = express();
 
@@ -40,7 +41,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://localhost:3000')
     .split(',')
-    .map(origin => origin.trim())
+    .map(origin => origin.trim().replace(/\/+$/, '')) // strip trailing slashes - Origin header never has one
     .filter(Boolean);
 
 // Local dev origins: localhost, 127.x, private ranges (WSL 172.16-31.x, LAN 192.168.x / 10.x)
@@ -109,6 +110,7 @@ app.use('/api/payments', paymentRouter);
 app.use('/api/orders', orderRouter);
 app.use('/api/addresses', addressRouter);
 app.use('/api/wallet', walletRouter);
+app.use('/api/riders', riderRouter);
 app.use('/api/contact', contactRoute);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/order-tracking', orderTrackingRoutes);
