@@ -9,6 +9,6 @@ contactRoute.get('/:id', protect, adminOnly, getMessageById)
 
 contactRoute.get('/', protect, adminOnly, getAllMessage)
 
-contactRoute.delete('/del', protect, adminOnly, deleteMessage);
+contactRoute.delete('/del/:id', protect, adminOnly, deleteMessage);
 
 export default contactRoute;

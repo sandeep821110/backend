@@ -3,6 +3,7 @@ import Payment from '../models/paymentModel.js';
 import Product from '../models/productModel.js';
 import Cart from '../models/cartModel.js';
 import Address from '../models/addressModel.js';
+import OrderTracking from '../models/orderTrackingModel.js';
 import { notifyOrderStatusChange } from './orderTrackingController.js';
 import {
     validateFreeDeliveryReward,
@@ -1098,6 +1099,47 @@ export const confirmOrder = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to confirm order',
+            error: error.message
+        });
+    }
+};
+
+// Admin: permanently delete any order and its related records
+export const deleteOrderAdmin = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid order ID'
+            });
+        }
+
+        const order = await Order.findById(id);
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        await Promise.all([
+            OrderTracking.deleteMany({ $or: [{ orderId: id }, { orders: id }] }),
+            Payment.deleteMany({ order: id })
+        ]);
+
+        await Order.findByIdAndDelete(id);
+
+        res.status(200).json({
+            success: true,
+            message: `Order ${order.orderNumber || order._id} deleted successfully`
+        });
+    } catch (error) {
+        console.error('Error deleting order:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete order',
             error: error.message
         });
     }

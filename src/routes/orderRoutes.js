@@ -21,7 +21,8 @@ import {
     updateOrderTracking,
     refundOrder,
     getOrderTimeline,
-    confirmOrder // Add this new import
+    confirmOrder, // Add this new import
+    deleteOrderAdmin
 } from '../controller/orderController.js';
 
 const orderRouter = express.Router();
@@ -55,6 +56,7 @@ orderRouter.get('/admin/all', adminOnly, getAllOrders);
 orderRouter.get('/admin/analytics', adminOnly, getOrderAnalytics);
 orderRouter.get('/admin/:id', adminOnly, getOrderByIdAdmin);
 orderRouter.patch('/admin/:id/status', adminOnly, updateOrderStatus);
+orderRouter.delete('/admin/:id', adminOnly, deleteOrderAdmin);
 
 // Additional admin functionalities
 orderRouter.get('/admin/date-range', adminOnly, getOrdersByDateRange);
