@@ -111,7 +111,6 @@ wishlistSchema.methods.addProduct = function(product) {
 };
 
 // Create indexes for better performance
-wishlistSchema.index({ user: 1 });
 wishlistSchema.index({ user: 1, 'items.productId': 1 });
 wishlistSchema.index({ updatedAt: -1 });
 

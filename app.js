@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { configDotenv } from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
@@ -29,6 +30,7 @@ const app = express();
 
 // Connect to database
 connectDB();
+configDotenv()
 
 // Behind a reverse proxy (Vercel / Render / Railway / Nginx) - needed for correct IPs & HTTPS detection
 app.set('trust proxy', 1);
@@ -36,26 +38,22 @@ app.set('trust proxy', 1);
 // Security headers
 app.use(helmet());
 
-// CORS: strict whitelist in production, relaxed for local/WSL/LAN development.
-const isProduction = process.env.NODE_ENV === 'production';
-
-const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_ORIGIN || 'http://localhost:5173,http://localhost:3000')
+// CORS: OPEN by default so any deployed frontend can call the API.
+// Set CORS_ORIGINS / CLIENT_ORIGIN to enforce a strict whitelist instead
+// (comma-separated, use '*' inside the list to keep it open explicitly).
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_ORIGIN || '')
     .split(',')
     .map(origin => origin.trim().replace(/\/+$/, '')) // strip trailing slashes - Origin header never has one
     .filter(Boolean);
 
-// Local dev origins: localhost, 127.x, private ranges (WSL 172.16-31.x, LAN 192.168.x / 10.x)
-const privateOriginPattern = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|\[::1\])(:\d+)?$/i;
+const corsOpen = allowedOrigins.length === 0 || allowedOrigins.includes('*');
 
 const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (mobile apps, curl, server-to-server)
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
-        // In development also allow any local/private network origin (e.g. WSL IP)
-        if (!isProduction && privateOriginPattern.test(origin)) {
+        if (corsOpen || allowedOrigins.includes(origin)) {
+            // Reflect the origin (never '*') so credentials stay supported
             return callback(null, true);
         }
         return callback(new Error(`Origin ${origin} not allowed by CORS`));

@@ -139,7 +139,7 @@ orderTrackingSchema.statics.generateTrackingNumber = async function (orderId) {
 };
 
 orderTrackingSchema.index({ user: 1, shippingAddress: 1 });
-orderTrackingSchema.index({ trackingNumber: 1 }, { unique: true });
+// trackingNumber field already declares unique: true (implicit index)
 
 orderTrackingSchema.pre("save", function (next) {
   if (this.isNew && (!this.trackingHistory || !this.trackingHistory.length)) {

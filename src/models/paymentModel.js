@@ -86,7 +86,6 @@ const paymentSchema = new mongoose.Schema({
 paymentSchema.index({ user: 1, status: 1 });
 paymentSchema.index({ order: 1 }, { unique: true });
 paymentSchema.index({ 'razorpayDetails.paymentId': 1 });
-paymentSchema.index({ transactionId: 1 });
 paymentSchema.index({ createdAt: -1 });
 
 // Generate unique transaction ID

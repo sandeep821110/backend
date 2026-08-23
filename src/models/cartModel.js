@@ -72,7 +72,7 @@ cartSchema.virtual('discountedTotal').get(function() {
 });
 
 // Every cart operation starts with findOne({ user })
-cartSchema.index({ user: 1 });
+// user field already declares unique: true (implicit index)
 
 const Cart = mongoose.model('Cart', cartSchema);
 export default Cart;

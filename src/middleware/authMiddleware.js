@@ -39,10 +39,12 @@ export const protect = async (req, res, next) => {
 
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
       if (error.name === 'TokenExpiredError') {
+        // Normal client state (idle session) - log concisely, no stack
+        console.warn(`[auth] expired token on ${req.method} ${req.originalUrl} (expiredAt: ${error.expiredAt?.toISOString()})`);
         return res.status(401).json({ message: 'Token expired' });
       }
+      console.error('Token verification error:', error);
       res.status(401).json({ message: 'Not authorized, token failed' });
     }
   } else {

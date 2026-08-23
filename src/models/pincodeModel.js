@@ -20,8 +20,7 @@ const pincodeSchema = new mongoose.Schema({
     
 },{timestamps:true});
 
-// Serviceability lookups always query by pincode
-pincodeSchema.index({ pincode: 1 });
+// pincode field already declares unique: true (implicit index)
 
 const Pincode = mongoose.model('Pincode', pincodeSchema);
 
