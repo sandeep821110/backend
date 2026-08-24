@@ -41,7 +41,7 @@ app.use(helmet());
 // CORS: OPEN by default so any deployed frontend can call the API.
 // Set CORS_ORIGINS / CLIENT_ORIGIN to enforce a strict whitelist instead
 // (comma-separated, use '*' inside the list to keep it open explicitly).
-const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_ORIGIN || '')
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_ORIGIN || 'https://www.choosemood.in/')
     .split(',')
     .map(origin => origin.trim().replace(/\/+$/, '')) // strip trailing slashes - Origin header never has one
     .filter(Boolean);
