@@ -41,6 +41,7 @@ app.use(helmet());
 const allowedOrigins = [
     "https://www.choosemood.in",
     "https://choosemood.in",
+    "http://localhost:5173/",
 ];
 
 app.use(cors({
