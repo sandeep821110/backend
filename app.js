@@ -38,33 +38,17 @@ app.set('trust proxy', 1);
 // Security headers
 app.use(helmet());
 
-// CORS: OPEN by default so any deployed frontend can call the API.
-// Set CORS_ORIGINS / CLIENT_ORIGIN to enforce a strict whitelist instead
-// (comma-separated, use '*' inside the list to keep it open explicitly).
-const allowedOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_ORIGIN ||
-    'https://www.choosemood.in,https://choosemood.in')
-    .split(',')
-    .map(origin => origin.trim().replace(/\/+$/, '')) // strip trailing slashes - Origin header never has one
-    .filter(Boolean);
+app.use(cors({
+    origin: [
+        "https://www.choosemood.in",
+        "https://choosemood.in"
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+}));
 
-const corsOpen = allowedOrigins.length === 0 || allowedOrigins.includes('*');
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, curl, server-to-server)
-        if (!origin) return callback(null, true);
-        if (corsOpen || allowedOrigins.includes(origin)) {
-            // Reflect the origin (never '*') so credentials stay supported
-            return callback(null, true);
-        }
-        return callback(new Error(`Origin ${origin} not allowed by CORS`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'User-Email', 'User-ID']
-};
-
-app.use(cors(corsOptions));
+app.options('/*splat', cors());
 
 // Body parsers
 app.use(express.json({ limit: '2mb' }));
@@ -153,7 +137,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
     console.error(`[ERROR] ${req.method} ${req.originalUrl}:`, err.message);
 
-    if (err.message && err.message.includes('not allowed by CORS')) {
+    if (err.message && err.message.toLowerCase().includes('not allowed by cors')) {
         return res.status(403).json({ success: false, message: 'CORS policy: origin not allowed' });
     }
 
