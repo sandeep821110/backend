@@ -44,7 +44,7 @@ app.use(cors({
         "https://choosemood.in"
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "user-id"],
     credentials: true
 }));
 
