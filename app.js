@@ -38,16 +38,45 @@ app.set('trust proxy', 1);
 // Security headers
 app.use(helmet());
 
+const allowedOrigins = [
+    "https://www.choosemood.in",
+    "https://choosemood.in",
+];
+
 app.use(cors({
-    origin: [
-        "https://www.choosemood.in",
-        "https://choosemood.in"
+    origin: function (origin, callback) {
+        // Allow requests such as Postman/server-to-server
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error("Not allowed by CORS"));
+    },
+
+    methods: [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS"
     ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "user-id"],
+
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "user-id",
+        "user-email"
+    ],
+
     credentials: true
 }));
 
+// NOTE: Express 5 / path-to-regexp v8 requires named wildcards - "*" crashes on boot
 app.options('/*splat', cors());
 
 // Body parsers
