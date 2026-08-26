@@ -111,7 +111,7 @@ export const createOrder = async (req, res) => {
 
         // Calculate totals
         const subtotal = cart.totalAmount;
-        const shippingCharges = freeDeliveryApplied ? 0 : 30;
+        const shippingCharges = freeDeliveryApplied ? 0 : (subtotal >= 999 ? 0 : 49);
         const tax = 0;
         const totalAmount = subtotal + shippingCharges;
 

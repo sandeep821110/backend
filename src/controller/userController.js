@@ -283,6 +283,59 @@ const refreshAccessToken = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// Complete profile — called after OTP verification to collect name, phone, etc.
+// ---------------------------------------------------------------------------
+
+const completeProfile = async (req, res) => {
+    const { name, phoneNumber } = req.body;
+
+    if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, message: 'Name is required' });
+    }
+
+    try {
+        const user = await userModel.findById(req.user.id);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+        user.name = name.trim();
+
+        if (phoneNumber) {
+            if (!/^[6-9]\d{9}$/.test(phoneNumber)) {
+                return res.status(400).json({ success: false, message: 'Invalid phone number. Must be 10 digits starting with 6-9.' });
+            }
+            // Check if phone is already taken by another user
+            const existing = await userModel.findOne({ phoneNumber, _id: { $ne: user._id } });
+            if (existing) {
+                return res.status(400).json({ success: false, message: 'Phone number already registered with another account.' });
+            }
+            user.phoneNumber = phoneNumber;
+        }
+
+        user.profileCompleted = true;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Profile completed successfully',
+            user: {
+                id: user._id,
+                email: user.email,
+                name: user.name,
+                phoneNumber: user.phoneNumber || '',
+                isVerified: user.isVerified,
+                profileCompleted: true
+            }
+        });
+    } catch (error) {
+        console.error('completeProfile error:', error);
+        if (error.code === 11000 && error.keyPattern?.phoneNumber) {
+            return res.status(400).json({ success: false, message: 'Phone number already registered.' });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// ---------------------------------------------------------------------------
 // Logout
 // ---------------------------------------------------------------------------
 
@@ -470,5 +523,6 @@ export {
     adminLogin,
     resendOtp,
     updateProfile,
-    refreshAccessToken
+    refreshAccessToken,
+    completeProfile
 };

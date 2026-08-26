@@ -36,7 +36,7 @@ const isValidObjectId = (id) => {
 // Utility function to calculate order totals (with coupon + optional wallet balance + free delivery coupon)
 const calculateOrderTotals = async (cartItems, couponCode = null, userId = null, useWalletBalance = false, freeDeliveryCode = null) => {
     const subtotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-    let shippingCharges = subtotal >= 500 ? 0 : 30; // Free shipping above ₹500
+    let shippingCharges = subtotal >= 999 ? 0 : 49; // Free shipping above ₹999
     const tax = 0;
     let discount = 0;
     let freeDeliveryApplied = false;

@@ -38,6 +38,10 @@ const userSchema = new mongoose.Schema({
         required: true,
         default: false
     },
+    profileCompleted: {
+        type: Boolean,
+        default: false
+    },
     refreshToken: {
         type: String,
         default: null
