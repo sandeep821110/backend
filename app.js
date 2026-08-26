@@ -47,6 +47,7 @@ app.use(helmet());
 const defaultOrigins = [
     "https://www.choosemood.in",
     "https://choosemood.in",
+    "https://admin-omega-ten-77.vercel.app",
     "http://localhost:5173",
     "http://localhost:5174"
 ];
