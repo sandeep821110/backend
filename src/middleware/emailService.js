@@ -34,7 +34,7 @@ const sendEmail = async (to, subject, text, html) => {
 
 // Function to send OTP email
 const sendOTPEmail = async (to, otp) => {
-  const subject = 'Your FLY STORE Verification Code';
+  const subject = 'Your CHOOSEMOOD Verification Code';
   const text = `Your verification code is: ${otp}. It will expire in 10 minutes.`;
   const html = `
 <!DOCTYPE html>
@@ -43,7 +43,7 @@ const sendOTPEmail = async (to, otp) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>FLY STORE - Verification Code</title>
+  <title>CHOOSEMOOD - Verification Code</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
@@ -54,8 +54,8 @@ const sendOTPEmail = async (to, otp) => {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #E72744 0%, #c81e38 100%); padding:32px 40px; text-align:center;">
-              <h1 style="margin:0; font-size:28px; font-weight:800; color:#ffffff; letter-spacing:3px; text-transform:uppercase;">FLY STORE</h1>
-              <p style="margin:6px 0 0; font-size:12px; color:rgba(255,255,255,0.8); letter-spacing:1px; text-transform:uppercase;">choosemood</p>
+              <h1 style="margin:0; font-size:28px; font-weight:800; color:#ffffff; letter-spacing:3px; text-transform:uppercase;">CHOOSEMOOD</h1>
+              <p style="margin:6px 0 0; font-size:12px; color:rgba(255,255,255,0.8); letter-spacing:1px; text-transform:uppercase;">spark in fashion</p>
             </td>
           </tr>
 
@@ -101,7 +101,7 @@ const sendOTPEmail = async (to, otp) => {
                 <tr>
                   <td style="padding:16px 20px;">
                     <p style="margin:0; font-size:13px; color:#8c1628; line-height:1.5;">
-                      <strong>⚠️ Security Note:</strong> Never share this code with anyone. FLY STORE will never ask for your verification code over phone or chat.
+                      <strong>⚠️ Security Note:</strong> Never share this code with anyone. CHOOSEMOOD will never ask for your verification code over phone or chat.
                     </p>
                   </td>
                 </tr>
@@ -116,7 +116,7 @@ const sendOTPEmail = async (to, otp) => {
                 This email was sent to <strong style="color:#525252;">${to}</strong>
               </p>
               <p style="margin:0; font-size:12px; color:#a3a3a3; line-height:1.5;">
-                © 2026 FLY STORE by choosemood. All rights reserved.
+                © 2026 CHOOSEMOOD. All rights reserved.
               </p>
             </td>
           </tr>
