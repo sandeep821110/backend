@@ -57,9 +57,6 @@ export const protect = async (req, res, next) => {
 
 export const adminOnly = (req, res, next) => {
     if (req.user && req.user.isAdmin) {
-        if (req.user.tokenExpiry && new Date() > req.user.tokenExpiry) {
-            return res.status(401).json({ message: 'Admin token expired', code: 'TOKEN_EXPIRED' });
-        }
         next();
     } else {
         res.status(403).json({ message: 'Not authorized as an admin' });

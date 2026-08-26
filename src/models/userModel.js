@@ -38,6 +38,14 @@ const userSchema = new mongoose.Schema({
         required: true,
         default: false
     },
+    isAdmin: {
+        type: Boolean,
+        default: false
+    },
+    isBlocked: {
+        type: Boolean,
+        default: false
+    },
     profileCompleted: {
         type: Boolean,
         default: false

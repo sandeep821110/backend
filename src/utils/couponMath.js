@@ -6,12 +6,15 @@ const round2 = (num) => Math.round((Number(num) || 0) * 100) / 100;
 
 /**
  * Compute the discount a coupon gives on a subtotal.
- * @param {{discountType:'PERCENTAGE'|'FIXED', discountValue:number, maximumDiscount?:number|null}} coupon
+ * @param {{discountType:'PERCENTAGE'|'FIXED'|'FREE_DELIVERY', discountValue:number, maximumDiscount?:number|null}} coupon
  * @param {number} subtotal
  * @returns {number} rounded discount amount
  */
 export function computeCouponDiscount(coupon, subtotal) {
     if (!coupon || typeof subtotal !== 'number' || !(subtotal > 0)) return 0;
+
+    // FREE_DELIVERY coupons give ₹0 price discount — shipping is handled separately
+    if (coupon.discountType === 'FREE_DELIVERY') return 0;
 
     let discount = 0;
     if (coupon.discountType === 'PERCENTAGE') {

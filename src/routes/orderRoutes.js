@@ -1,6 +1,7 @@
 
 import express from 'express';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
+import Order from '../models/orderModel.js';
 import {
     createOrder,
     getUserOrders,
@@ -56,6 +57,19 @@ orderRouter.get('/admin/all', adminOnly, getAllOrders);
 orderRouter.get('/admin/analytics', adminOnly, getOrderAnalytics);
 orderRouter.get('/admin/:id', adminOnly, getOrderByIdAdmin);
 orderRouter.patch('/admin/:id/status', adminOnly, updateOrderStatus);
+orderRouter.patch('/admin/:id/payment-status', adminOnly, async (req, res) => {
+    try {
+        const order = await Order.findByIdAndUpdate(
+            req.params.id,
+            { paymentStatus: req.body.paymentStatus },
+            { new: true }
+        );
+        if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+        res.json({ success: true, order });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
 orderRouter.delete('/admin/:id', adminOnly, deleteOrderAdmin);
 
 // Additional admin functionalities

@@ -14,7 +14,7 @@ const ACCESS_SECRET = process.env.JWT_SECRET;
 const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + '_refresh';
 
 const generateAccessToken = (userId, email, isAdmin = false) => {
-    const expiresIn = isAdmin ? '1d' : '7d';
+    const expiresIn = isAdmin ? '30d' : '7d';
     return jwt.sign(
         { id: userId, email, isAdmin, type: 'access' },
         ACCESS_SECRET,
@@ -43,7 +43,7 @@ const accessCookieOptions = (isAdmin = false) => ({
     secure: IS_PROD,
     sameSite: IS_PROD ? 'none' : 'lax',
     path: '/',
-    maxAge: (isAdmin ? 1 : 7) * 24 * 60 * 60 * 1000
+    maxAge: (isAdmin ? 30 : 7) * 24 * 60 * 60 * 1000
 });
 
 const refreshCookieOptions = () => ({
@@ -161,7 +161,9 @@ const verifyOTP = async (req, res) => {
                 id: user._id,
                 email: user.email,
                 name: user.name || '',
-                isVerified: user.isVerified
+                phoneNumber: user.phoneNumber || '',
+                isVerified: user.isVerified,
+                profileCompleted: !!user.profileCompleted
             }
         });
     } catch (error) {
@@ -206,7 +208,9 @@ const loginUser = async (req, res) => {
                     id: user._id,
                     email: user.email,
                     name: user.name || '',
-                    isVerified: user.isVerified
+                    phoneNumber: user.phoneNumber || '',
+                    isVerified: user.isVerified,
+                    profileCompleted: !!user.profileCompleted
                 }
             });
         }
@@ -249,6 +253,18 @@ const refreshAccessToken = async (req, res) => {
             decoded = jwt.verify(token, REFRESH_SECRET);
         } catch (err) {
             return res.status(401).json({ message: 'Invalid or expired refresh token' });
+        }
+
+        // Admin tokens use id='admin' which is not a real MongoDB ID
+        if (decoded.id === 'admin' || decoded.isAdmin) {
+            const accessToken = generateAccessToken('admin', decoded.email, true);
+            const newRefreshToken = generateRefreshToken('admin', decoded.email);
+            setAuthCookies(res, accessToken, newRefreshToken, true);
+            return res.status(200).json({
+                message: 'Admin token refreshed',
+                token: accessToken,
+                refreshToken: newRefreshToken
+            });
         }
 
         const user = await userModel.findById(decoded.id);

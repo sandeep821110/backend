@@ -61,6 +61,12 @@ const calculateOrderTotals = async (cartItems, couponCode = null, userId = null,
             if (subtotal >= coupon.minimumPurchase) {
                 discount = computeCouponDiscount(coupon, subtotal);
 
+                // FREE_DELIVERY coupon: waive shipping charges
+                if (coupon.discountType === 'FREE_DELIVERY') {
+                    shippingCharges = 0;
+                    freeDeliveryApplied = true;
+                }
+
                 // Update usage count
                 await Coupon.findByIdAndUpdate(coupon._id, {
                     $inc: { usedCount: 1 }
@@ -173,6 +179,31 @@ const clearUserCart = async (userId) => {
         { user: userId },
         { $set: { items: [], totalAmount: 0, totalItems: 0 } }
     );
+};
+
+// Remove only specific items from cart (by their _id), keep the rest
+const removeCartItems = async (userId, itemIds) => {
+    if (!itemIds || itemIds.length === 0) return;
+    await Cart.findOneAndUpdate(
+        { user: userId },
+        { $pull: { items: { _id: { $in: itemIds } } } },
+        { new: true }
+    );
+    // Recalculate totals
+    const cart = await Cart.findOne({ user: userId });
+    if (cart) {
+        cart.totalAmount = cart.items.reduce((t, i) => t + (i.price * i.quantity), 0);
+        cart.totalItems = cart.items.reduce((t, i) => t + i.quantity, 0);
+        await cart.save();
+    }
+};
+
+// Filter cart items to only the selected ones (by _id). If no selection provided, use all items (backwards compat).
+const filterCartItems = (cartItems, selectedItemIds) => {
+    if (!selectedItemIds || !Array.isArray(selectedItemIds) || selectedItemIds.length === 0) {
+        return cartItems; // backwards compat: no selection = all items
+    }
+    return cartItems.filter(item => selectedItemIds.includes(String(item._id)));
 };
 
 // Create an order fully paid using wallet balance
@@ -317,7 +348,7 @@ export const getCheckoutSummary = async (req, res) => {
 export const createRazorpayOrderForPayment = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { addressId, couponCode, useWalletBalance, freeDeliveryCode } = req.body;
+        const { addressId, couponCode, useWalletBalance, freeDeliveryCode, selectedItemIds } = req.body;
 
         // Get user's cart
         const cart = await Cart.findOne({ user: userId }).populate('items.product');
@@ -325,16 +356,22 @@ export const createRazorpayOrderForPayment = async (req, res) => {
         // Validate cart and stock
         await validateCartAndStock(cart);
 
+        // Filter to only selected items
+        const orderItems = filterCartItems(cart.items, selectedItemIds);
+        if (orderItems.length === 0) {
+            return res.status(400).json({ success: false, message: 'No items selected for checkout' });
+        }
+
         // Validate address
         const address = await validateAndGetAddress(addressId, userId);
 
         // Calculate totals (including wallet and free delivery coupon if requested)
         // Invalid free-delivery codes fail here BEFORE any payment is taken
-        const totals = await calculateOrderTotals(cart.items, couponCode, userId, !!useWalletBalance, freeDeliveryCode || null);
+        const totals = await calculateOrderTotals(orderItems, couponCode, userId, !!useWalletBalance, freeDeliveryCode || null);
 
         // If wallet covers the entire amount, complete the order without Razorpay
         if (totals.totalAmount <= 0) {
-            const order = await createWalletPaidOrder(userId, cart, address, totals, couponCode, freeDeliveryCode || null);
+            const order = await createWalletPaidOrder(userId, { items: orderItems }, address, totals, couponCode, freeDeliveryCode || null);
             return res.status(200).json({
                 success: true,
                 message: 'Order placed successfully using wallet balance',
@@ -443,7 +480,8 @@ export const verifyRazorpayPaymentAndCreateOrder = async (req, res) => {
             notes,
             couponCode,
             useWalletBalance,
-            freeDeliveryCode
+            freeDeliveryCode,
+            selectedItemIds
         } = req.body;
 
         // Validate required fields
@@ -511,11 +549,14 @@ export const verifyRazorpayPaymentAndCreateOrder = async (req, res) => {
         // Validate cart and stock
         await validateCartAndStock(cart);
 
+        // Filter to only selected items
+        const orderItems = filterCartItems(cart.items, selectedItemIds);
+
         // Validate address
         const address = await validateAndGetAddress(addressId, userId);
 
         // Calculate totals (including wallet portion and free delivery coupon used during step 1)
-        const totals = await calculateOrderTotals(cart.items, couponCode, userId, !!useWalletBalance, freeDeliveryCode || null);
+        const totals = await calculateOrderTotals(orderItems, couponCode, userId, !!useWalletBalance, freeDeliveryCode || null);
 
         // Verify payment amount matches calculated remaining total
         if (paymentDetails.amount !== Math.round(totals.totalAmount * 100)) {
@@ -548,7 +589,7 @@ export const verifyRazorpayPaymentAndCreateOrder = async (req, res) => {
         const order = new Order({
             user: userId,
             orderNumber,
-            items: cart.items.map(item => ({
+            items: orderItems.map(item => ({
                 product: item.product._id,
                 productName: item.product.name,
                 productImage: (item.product.images && item.product.images.length > 0) ? item.product.images[0] : '',
@@ -605,11 +646,12 @@ export const verifyRazorpayPaymentAndCreateOrder = async (req, res) => {
 
         await payment.save();
 
-        // Update product stock
-        await updateProductStock(cart.items);
+        // Update product stock for selected items only
+        await updateProductStock(orderItems);
 
-        // Clear cart
-        await clearUserCart(userId);
+        // Remove only purchased items from cart (keep rest)
+        const purchasedIds = orderItems.map(i => i._id);
+        await removeCartItems(userId, purchasedIds);
 
         res.status(201).json({
             success: true,
@@ -642,7 +684,7 @@ export const verifyRazorpayPaymentAndCreateOrder = async (req, res) => {
 export const createCODOrder = async (req, res) => {
     try {
         const userId = req.user.id;
-        let { addressId, couponCode, notes, useWalletBalance, freeDeliveryCode } = req.body;
+        let { addressId, couponCode, notes, useWalletBalance, freeDeliveryCode, selectedItemIds } = req.body;
 
         // Ensure notes is a string
         notes = notes && typeof notes === 'string' ? notes : '';
@@ -653,12 +695,18 @@ export const createCODOrder = async (req, res) => {
         // Validate cart and stock
         await validateCartAndStock(cart);
 
+        // Filter to only selected items (backwards compat: if no selection, use all)
+        const orderItems = filterCartItems(cart.items, selectedItemIds);
+        if (orderItems.length === 0) {
+            return res.status(400).json({ success: false, message: 'No items selected for checkout' });
+        }
+
         // Validate address
         const address = await validateAndGetAddress(addressId, userId);
 
         // Calculate totals (including wallet and free delivery coupon if requested)
         // Invalid free-delivery codes fail before the order is created
-        const totals = await calculateOrderTotals(cart.items, couponCode, userId, !!useWalletBalance, freeDeliveryCode || null);
+        const totals = await calculateOrderTotals(orderItems, couponCode, userId, !!useWalletBalance, freeDeliveryCode || null);
 
         // Debit wallet portion up-front; credit back on failure below
         if (totals.walletApplied > 0) {
@@ -684,7 +732,7 @@ export const createCODOrder = async (req, res) => {
             const order = new Order({
                 user: userId,
                 orderNumber,
-                items: cart.items.map(item => ({
+                items: orderItems.map(item => ({
                     product: item.product._id,
                     productName: item.product.name,
                     productImage: (item.product.images && item.product.images.length > 0) ? item.product.images[0] : '',
@@ -729,11 +777,12 @@ export const createCODOrder = async (req, res) => {
 
             await payment.save();
 
-            // Update product stock
-            await updateProductStock(cart.items);
+            // Update product stock for selected items only
+            await updateProductStock(orderItems);
 
-            // Clear cart
-            await clearUserCart(userId);
+            // Remove only purchased items from cart (keep rest)
+            const purchasedIds = orderItems.map(i => i._id);
+            await removeCartItems(userId, purchasedIds);
 
             res.status(201).json({
                 success: true,
@@ -1609,7 +1658,8 @@ export const validateCoupon = async (req, res) => {
                     discountValue: coupon.discountValue,
                     discountAmount: discountAmount,
                     minimumPurchase: coupon.minimumPurchase,
-                    maximumDiscount: coupon.maximumDiscount
+                    maximumDiscount: coupon.maximumDiscount,
+                    freeDelivery: coupon.discountType === 'FREE_DELIVERY'
                 }
             }
         });
@@ -1641,10 +1691,18 @@ export const createCoupon = async (req, res) => {
         } = req.body;
 
         // Validate required fields
-        if (!code || !description || !discountType || !discountValue || !startDate || !endDate) {
+        if (!code || !description || !discountType || !startDate || !endDate) {
             return res.status(400).json({
                 success: false,
                 message: 'Missing required fields'
+            });
+        }
+
+        // discountValue required for PERCENTAGE and FIXED, but not for FREE_DELIVERY
+        if (discountType !== 'FREE_DELIVERY' && (!discountValue || discountValue <= 0)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Discount value is required for percentage and fixed coupons'
             });
         }
 

@@ -39,5 +39,6 @@ addressRouter.patch('/:id/default', setDefaultAddress);
 // Admin routes (require authentication + admin privileges)
 addressRouter.get('/admin/all', adminOnly, getAllAddresses);
 addressRouter.get('/admin/:id', adminOnly, getAddressByIdAdmin);
+addressRouter.delete('/admin/:id', adminOnly, deleteAddress);
 
 export default addressRouter;
