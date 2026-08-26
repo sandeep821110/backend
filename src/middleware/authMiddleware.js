@@ -3,16 +3,36 @@ import jwt from 'jsonwebtoken';
 import userModel from '../models/userModel.js';
 
 export const protect = async (req, res, next) => {
-  // Cookie-based session first (httpOnly), Bearer header as fallback
-  let token;
+  // Try cookie first, then Bearer header. If cookie exists but is invalid,
+  // fall back to the Bearer header instead of immediately rejecting.
+  let token = null;
+  let cookieToken = null;
+  let bearerToken = null;
 
   if (req.cookies?.access_token) {
-    token = req.cookies.access_token;
-  } else if (
+    cookieToken = req.cookies.access_token;
+  }
+  if (
     req.headers.authorization &&
     req.headers.authorization.startsWith('Bearer')
   ) {
-    token = req.headers.authorization.split(' ')[1];
+    bearerToken = req.headers.authorization.split(' ')[1];
+  }
+
+  // Prefer cookie, but fall back to Bearer if cookie fails verification
+  if (cookieToken) {
+    try {
+      const decoded = jwt.verify(cookieToken, process.env.JWT_SECRET);
+      token = cookieToken;
+      req._decodedToken = decoded;
+    } catch (err) {
+      // Cookie token invalid/expired — try Bearer as fallback
+      if (bearerToken) {
+        token = bearerToken;
+      }
+    }
+  } else if (bearerToken) {
+    token = bearerToken;
   }
 
   if (!token) {
@@ -20,8 +40,8 @@ export const protect = async (req, res, next) => {
   }
 
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Verify token (skip if already decoded from cookie above)
+    const decoded = req._decodedToken || jwt.verify(token, process.env.JWT_SECRET);
 
     // Get user from the token
     if (decoded.isAdmin) {
@@ -41,7 +61,6 @@ export const protect = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      // Normal client state (idle session) - log concisely, no stack
       console.warn(`[auth] expired token on ${req.method} ${req.originalUrl} (expiredAt: ${error.expiredAt?.toISOString()})`);
       return res.status(401).json({ message: 'Token expired' });
     }
