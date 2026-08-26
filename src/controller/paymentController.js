@@ -421,9 +421,12 @@ export const createRazorpayOrderForPayment = async (req, res) => {
 
     } catch (error) {
         console.error('Error creating Razorpay order:', error);
+        const isConfigIssue = !process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET;
         res.status(500).json({
             success: false,
-            message: error.message || 'Failed to create payment order',
+            message: isConfigIssue
+                ? 'Payment service is not configured. Please contact support.'
+                : (error.message || 'Failed to create payment order'),
             error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
         });
     }

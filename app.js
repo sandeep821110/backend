@@ -32,6 +32,12 @@ const app = express();
 connectDB();
 configDotenv()
 
+const _requiredEnv = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'MONGODB_URI', 'JWT_SECRET'];
+const _missing = _requiredEnv.filter(k => !process.env[k]);
+if (_missing.length) {
+    console.error(`[startup] ⚠️  Missing required env vars: ${_missing.join(', ')}`);
+}
+
 // Behind a reverse proxy (Vercel / Render / Railway / Nginx) - needed for correct IPs & HTTPS detection
 app.set('trust proxy', 1);
 
