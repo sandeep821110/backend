@@ -1,7 +1,7 @@
 /**
  * TTL response cache for hot GET endpoints.
  *
- * Production (REDIS_URL set): entries live in shared Redis so EVERY
+ * Production (Redis/Upstash set): entries live in shared cache so EVERY
  * load-balanced instance / cluster worker serves the same cache and
  * invalidations propagate instantly across replicas.
  *
@@ -11,7 +11,7 @@
 
 import redisClient from '../config/redis.js';
 
-const memoryStore = new Map(); // key -> { expiresAt, body, contentType }
+const memoryStore = new Map();
 const MAX_ENTRIES = parseInt(process.env.CACHE_MAX_ENTRIES || '', 10) || 500;
 const KEY_PREFIX = 'flystore:resp-cache:';
 
@@ -29,20 +29,14 @@ const evictIfNeeded = () => {
     }
 };
 
-const redisReady = () => !!redisClient && redisClient.status === 'ready';
+const redisReady = () => !!redisClient && (redisClient.status === 'ready' || redisClient.constructor?.name === 'UpstashRedis');
 
-/**
- * Middleware factory: caches successful GET responses for `ttlSeconds`.
- * Usage: router.get('/products', cacheMiddleware(60), handler)
- */
 export const cacheMiddleware = (ttlSeconds = 60) => async (req, res, next) => {
-    // Only cache safe, public reads
     if (req.method !== 'GET') return next();
-    if (req.headers.authorization || req.cookies?.token) return next();
+    if (req.headers.authorization || req.cookies?.access_token) return next();
 
     const key = buildCacheKey(req.method, req.originalUrl);
 
-    // ---- HIT? ----
     try {
         if (redisReady()) {
             const raw = await redisClient.get(key);
@@ -61,10 +55,9 @@ export const cacheMiddleware = (ttlSeconds = 60) => async (req, res, next) => {
             }
         }
     } catch (err) {
-        console.error('[cache] read failed:', err.message); // fall through to MISS
+        console.error('[cache] read failed:', err.message);
     }
 
-    // ---- MISS: capture the JSON response once generated ----
     const originalJson = res.json.bind(res);
     res.json = (body) => {
         const status = res.statusCode;
@@ -97,21 +90,29 @@ export const cacheMiddleware = (ttlSeconds = 60) => async (req, res, next) => {
 
 /**
  * Invalidate cached entries whose key contains ANY of the given path fragments.
- * Call after admin writes: invalidateCache('/api/products').
- * With Redis this clears the cache on ALL instances at once.
  */
 export const invalidateCache = (...pathFragments) => {
     if (redisReady()) {
-        const pattern = `${KEY_PREFIX}*`;
-        const stream = redisClient.scanStream({ match: pattern, count: 200 });
-        stream.on('data', async (keys) => {
-            if (!keys.length) return;
-            const doomed = pathFragments.length
-                ? keys.filter(k => pathFragments.some(frag => k.includes(frag)))
-                : keys;
-            if (doomed.length) redisClient.del(...doomed).catch(() => {});
-        });
-        stream.on('error', (err) => console.error('[cache] invalidate failed:', err.message));
+        // For Upstash REST, we use SCAN via the call interface
+        const scanAndDelete = async () => {
+            let cursor = '0';
+            do {
+                const result = await redisClient.scan(cursor, 'MATCH', `${KEY_PREFIX}*`, 'COUNT', 200);
+                if (!result) break;
+                const [nextCursor, keys] = Array.isArray(result) ? result : [result[0], result[1] || []];
+                cursor = nextCursor;
+
+                if (keys && keys.length) {
+                    const doomed = pathFragments.length
+                        ? keys.filter(k => pathFragments.some(frag => k.includes(frag)))
+                        : keys;
+                    if (doomed.length) {
+                        await redisClient.del(...doomed).catch(() => {});
+                    }
+                }
+            } while (cursor !== '0');
+        };
+        scanAndDelete().catch(err => console.error('[cache] invalidate failed:', err.message));
         return;
     }
 

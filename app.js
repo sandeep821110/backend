@@ -44,43 +44,40 @@ app.set('trust proxy', 1);
 // Security headers
 app.use(helmet());
 
-const allowedOrigins = [
+const defaultOrigins = [
     "https://www.choosemood.in",
     "https://choosemood.in",
-    "http://localhost:5173/",
+    "http://localhost:5173",
+    "http://localhost:5174"
 ];
+
+const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim().replace(/\/+$/, ''))
+    : defaultOrigins;
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests such as Postman/server-to-server
-        if (!origin) {
-            return callback(null, true);
-        }
+        // Allow requests with no origin (Postman, server-to-server, curl)
+        if (!origin) return callback(null, true);
 
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
+        const normalized = origin.replace(/\/+$/, '');
+        if (allowedOrigins.includes(normalized)) return callback(null, true);
 
         return callback(new Error("Not allowed by CORS"));
     },
 
-    methods: [
-        "GET",
-        "POST",
-        "PUT",
-        "PATCH",
-        "DELETE",
-        "OPTIONS"
-    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 
     allowedHeaders: [
         "Content-Type",
         "Authorization",
         "user-id",
-        "user-email"
+        "user-email",
+        "X-Requested-With"
     ],
 
-    credentials: true
+    credentials: true,
+    maxAge: 86400
 }));
 
 // NOTE: Express 5 / path-to-regexp v8 requires named wildcards - "*" crashes on boot
@@ -104,7 +101,8 @@ app.use(compression());
 // cluster workers, so limits hold no matter which replica serves a request.
 const redisStore = isRedisEnabled()
     ? new RedisStore({
-          sendCommand: (...args) => redisClient.call(...args)
+          sendCommand: (...args) => redisClient.call(...args),
+          prefix: 'flystore:rl:'
       })
     : undefined;
 
